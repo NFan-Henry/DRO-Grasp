@@ -17,10 +17,33 @@ def get_link_dir(robot_name, joint_name):
     if joint_name.startswith('virtual'):
         return None
 
-    if robot_name == 'allegro':
+    if robot_name in ('allegro', 'allegro_mirror'):
+        # allegro_mirror is D(R,O)'s own left allegro reflected through the
+        # xz-plane into a right hand (scripts/mirror_urdf.py), so the model is
+        # still looking at the geometry its checkpoint was trained on.
+        #
+        # The annotation carries over unchanged, and that is checked rather
+        # than assumed: scripts/compute_link_dir.py reads [0, 0, 1] off the
+        # mirrored chain for 15 of the 16 joints, because the mirror negates y
+        # and this direction has no y component. joint_12.0 reads back tilted,
+        # as it already does on the unmirrored hand -- upstream lumps it in
+        # with the rest, and so do we.
         if joint_name in ['joint_0.0', 'joint_4.0', 'joint_8.0', 'joint_13.0']:
             return None
         link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+    elif robot_name == 'allegro_ocir':
+        # Same hand as 'allegro', but OCIR's URDF, so that the model solves on
+        # the exact chain the simulator replays. The two URDFs are not related
+        # by any rigid transform, so nothing here can be copied from the entry
+        # above -- in particular the link direction is NEGATED. Both were read
+        # off the chain by scripts/compute_link_dir.py: the flexion links
+        # extend along -z from their joints here and along +z there. Copying
+        # [0, 0, 1] over would invert open/close silently, making the pregrasp
+        # squeeze shut instead of opening.
+        if joint_name in ['index_joint_0', 'middle_joint_0', 'ring_joint_0',
+                          'thumb_joint_1']:
+            return None
+        link_dir = torch.tensor([0, 0, -1], dtype=torch.float32)
     elif robot_name == 'barrett':
         if joint_name in ['bh_j11_joint', 'bh_j21_joint']:
             return None

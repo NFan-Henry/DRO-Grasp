@@ -1,8 +1,20 @@
 {
     "allegro": [],
     "barrett": [],
-    "ezgripper": ["base_link"],
+    "ezgripper": [
+        "base_link"
+    ],
     "robotiq_3finger": [],
-    "shadowhand": ["forearm", "wrist", "ffknuckle", "mfknuckle", "rfknuckle", "lfknuckle", "thbase"],
-    "leaphand": []
+    "shadowhand": [
+        "forearm",
+        "wrist",
+        "ffknuckle",
+        "mfknuckle",
+        "rfknuckle",
+        "lfknuckle",
+        "thbase"
+    ],
+    "leaphand": [],
+    "allegro_ocir": [],
+    "allegro_mirror": []
 }
