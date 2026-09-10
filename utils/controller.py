@@ -99,7 +99,11 @@ def controller(robot_name, q_para):
 
             frame_transform = status[frame_name].get_matrix()[batch_idx]
             axis_dir = frame_transform[:3, :3] @ joint.axis
-            link_dir = frame_transform[:3, :3] @ link_dir
+            # get_link_dir builds its tensor on the CPU while the chain has
+            # been moved to the solve device, so this matmul raises as soon as
+            # the hand is solved on a GPU. Upstream only ever runs the
+            # controller on the CPU, so the mismatch never surfaces there.
+            link_dir = frame_transform[:3, :3] @ link_dir.to(frame_transform.device)
             normal_dir = torch.cross(axis_dir, link_dir, dim=0)
             axis_origin = frame_transform[:3, 3]
             origin_dir = -axis_origin / torch.norm(axis_origin)
