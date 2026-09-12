@@ -71,9 +71,47 @@ def get_link_dir(robot_name, joint_name):
         else:
             link_dir = torch.tensor([0, -1, 0], dtype=torch.float32)
     else:
-        raise NotImplementedError(f"Unknown robot name: {robot_name}!")
+        # Every hand above needs a hand-written entry, which is what stopped
+        # this baseline from running on anything but the hands upstream shipped.
+        # A hand registered by scripts/register_ocir_hand.sh instead carries a
+        # derived table next to its URDF, written by scripts/compute_link_dir.py.
+        #
+        # The hard-coded entries stay authoritative: two of them (barrett's
+        # bh_j*1_joint, shadowhand's WRJ*) are excluded because those joints are
+        # abduction and wrist rather than flexion, which is a modelling choice
+        # and NOT recoverable from the chain -- the derived rule only finds the
+        # joints whose axis is parallel to their link, where cross(axis, dir) is
+        # zero and the open/close test has no answer at all. So this is a
+        # fallback for new hands, never an override of the table above.
+        table = _derived_link_dirs(robot_name)
+        if table is None:
+            raise NotImplementedError(f"Unknown robot name: {robot_name}!")
+        if joint_name not in table:
+            return None
+        value = table[joint_name]
+        return None if value is None else torch.tensor(value, dtype=torch.float32)
 
     return link_dir
+
+
+_DERIVED_LINK_DIR_CACHE = {}
+
+
+def _derived_link_dirs(robot_name):
+    """``data/data_urdf/robot/<name>/link_dir.json``, or None if absent."""
+
+    if robot_name in _DERIVED_LINK_DIR_CACHE:
+        return _DERIVED_LINK_DIR_CACHE[robot_name]
+
+    path = os.path.join(
+        ROOT_DIR, "data", "data_urdf", "robot", robot_name, "link_dir.json"
+    )
+    table = None
+    if os.path.isfile(path):
+        with open(path) as fh:
+            table = json.load(fh)["link_dir"]
+    _DERIVED_LINK_DIR_CACHE[robot_name] = table
+    return table
 
 
 def controller(robot_name, q_para):
