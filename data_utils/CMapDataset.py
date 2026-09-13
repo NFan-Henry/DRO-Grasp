@@ -22,8 +22,14 @@ class CMapDataset(Dataset):
         is_train: bool = True,
         debug_object_names: list = None,
         num_points: int = 512,
-        object_pc_type: str = 'random'
+        object_pc_type: str = 'random',
+        data_root: str = 'data'
     ):
+        # Upstream hard-codes 'data/' for the split file, the grasp file, the
+        # object meshes and the object clouds, so a second dataset could only be
+        # trained by overwriting the first. Made configurable; everything else
+        # about training is unchanged.
+        self.data_root = data_root
         self.batch_size = batch_size
         self.robot_names = robot_names if robot_names is not None \
             else ['barrett', 'allegro', 'shadowhand']
@@ -37,14 +43,14 @@ class CMapDataset(Dataset):
             self.hands[robot_name] = create_hand_model(robot_name, torch.device('cpu'))
             self.dofs.append(math.sqrt(self.hands[robot_name].dof))
 
-        split_json_path = os.path.join(ROOT_DIR, f'data/CMapDataset_filtered/split_train_validate_objects.json')
+        split_json_path = os.path.join(ROOT_DIR, f'{self.data_root}/CMapDataset_filtered/split_train_validate_objects.json')
         dataset_split = json.load(open(split_json_path))
         self.object_names = dataset_split['train'] if is_train else dataset_split['validate']
         if debug_object_names is not None:
             print("!!! Using debug objects !!!")
             self.object_names = debug_object_names
 
-        dataset_path = os.path.join(ROOT_DIR, f'data/CMapDataset_filtered/cmap_dataset.pt')
+        dataset_path = os.path.join(ROOT_DIR, f'{self.data_root}/CMapDataset_filtered/cmap_dataset.pt')
         metadata = torch.load(dataset_path)['metadata']
         self.metadata = [m for m in metadata if m[1] in self.object_names and m[2] in self.robot_names]
         if not self.is_train:
@@ -60,7 +66,7 @@ class CMapDataset(Dataset):
         if self.object_pc_type != 'fixed':
             for object_name in self.object_names:
                 name = object_name.split('+')
-                mesh_path = os.path.join(ROOT_DIR, f'data/data_urdf/object/{name[0]}/{name[1]}/{name[1]}.stl')
+                mesh_path = os.path.join(ROOT_DIR, f'{self.data_root}/data_urdf/object/{name[0]}/{name[1]}/{name[1]}.stl')
                 mesh = trimesh.load_mesh(mesh_path)
                 object_pc, _ = mesh.sample(65536, return_index=True)
                 self.object_pcs[object_name] = torch.tensor(object_pc, dtype=torch.float32)
@@ -96,7 +102,7 @@ class CMapDataset(Dataset):
 
                 if self.object_pc_type == 'fixed':
                     name = object_name.split('+')
-                    object_path = os.path.join(ROOT_DIR, f'data/PointCloud/object/{name[0]}/{name[1]}.pt')
+                    object_path = os.path.join(ROOT_DIR, f'{self.data_root}/PointCloud/object/{name[0]}/{name[1]}.pt')
                     object_pc = torch.load(object_path)[:, :3]
                 elif self.object_pc_type == 'random':
                     indices = torch.randperm(65536)[:self.num_points]
@@ -173,7 +179,7 @@ class CMapDataset(Dataset):
                     object_pc = object_pc[indices]
                 else:
                     name = object_name.split('+')
-                    object_path = os.path.join(ROOT_DIR, f'data/PointCloud/object/{name[0]}/{name[1]}.pt')
+                    object_path = os.path.join(ROOT_DIR, f'{self.data_root}/PointCloud/object/{name[0]}/{name[1]}.pt')
                     object_pc = torch.load(object_path)[:, :3]
 
                 initial_q_batch[batch_idx] = initial_q
@@ -213,7 +219,8 @@ def create_dataloader(cfg, is_train):
         robot_names=cfg.robot_names,
         is_train=is_train,
         debug_object_names=cfg.debug_object_names,
-        object_pc_type=cfg.object_pc_type
+        object_pc_type=cfg.object_pc_type,
+        data_root=cfg.get('data_root', 'data')
     )
     dataloader = DataLoader(
         dataset,

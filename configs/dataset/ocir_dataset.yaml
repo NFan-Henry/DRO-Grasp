@@ -1,0 +1,24 @@
+# Train D(R,O) on grasps recovered from OCIR trajectories.
+#
+# Select with `dataset=ocir_dataset` -- everything else about train.py (the
+# network, the four losses, the loop) is upstream's and unmodified.
+#
+# Build the tree this points at with:
+#   scripts/extract_grasp_frames.py   OCIR batch trajectories -> grasps
+#   scripts/pack_dro_dataset.py       -> the layout CMapDataset reads
+
+# Our data, kept beside the stock data/ rather than overwriting it.
+data_root: 'data_ocir'
+
+robot_names:
+  - 'allegro_ocir'
+
+debug_object_names: null
+
+batch_size: 8  # ~4 GB of GPU memory per unit
+num_workers: 16
+
+# 'random' resamples the object cloud from the mesh each time, which is what the
+# published models were trained with. 'fixed' reads the packed clouds instead
+# and is the option to use when meshes are unavailable on the training machine.
+object_pc_type: 'random'
